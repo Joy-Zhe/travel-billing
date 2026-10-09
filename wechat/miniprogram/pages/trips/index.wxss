@@ -1,0 +1,21 @@
+.hero-action {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+}
+.trip-name {
+  font-size: 34rpx;
+  font-weight: 600;
+  margin: 20rpx 0 12rpx;
+}
+.trip-dates {
+  font-size: 22rpx;
+  color: #9cac9e;
+  margin-top: 12rpx;
+}
+.trip-card {
+  box-shadow: 0 4rpx 15rpx #273e3504;
+}
+.trip-card .amount {
+  font-size: 31rpx;
+}

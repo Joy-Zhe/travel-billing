@@ -1,0 +1,30 @@
+.join {
+  text-align: center;
+  margin-top: 45rpx;
+  padding: 50rpx 34rpx;
+}
+.join-icon {
+  width: 110rpx;
+  height: 110rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 32rpx;
+  background: #eaf3e4;
+  color: #8faf91;
+  font-size: 80rpx;
+  margin: 0 auto 32rpx;
+}
+.join .heading {
+  font-size: 40rpx;
+}
+.join-detail {
+  text-align: left;
+  font-size: 25rpx;
+  line-height: 1.9;
+  color: #8ea18f;
+  background: #f2f7ee;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin: 34rpx 0;
+}

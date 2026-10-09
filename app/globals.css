@@ -9,6 +9,25 @@
   --soft: #e9f4ef;
   --font: "Noto Sans SC", "Microsoft YaHei", sans-serif;
 }
+.wechat-code {
+  font-family: monospace;
+  font-size: 28px;
+  letter-spacing: 4px;
+  padding: 22px;
+  text-align: center;
+  color: #188675;
+  background: #eef5ea;
+  border-radius: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 760px) {
+  .wechat-button-label {
+    display: none;
+  }
+  .topbar-actions {
+    gap: 7px;
+  }
+}
 * {
   box-sizing: border-box;
 }

@@ -1,4 +1,5 @@
 "use client";
+import WechatLink from "./wechat-link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
@@ -693,6 +694,7 @@ export default function LedgerApp() {
             {demo && <span className="demo-pill">示例预览</span>}
           </div>
           <div className="topbar-actions">
+            {user && <WechatLink />}
             <span className="secure-label">
               <ShieldCheck size={15} /> 成员私密共享
             </span>

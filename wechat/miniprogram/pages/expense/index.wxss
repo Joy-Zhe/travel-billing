@@ -1,0 +1,35 @@
+.currency-symbol {
+  font-size: 43rpx;
+  color: #7b9f85;
+}
+.amount-input {
+  flex: 1;
+  min-width: 0;
+}
+.participants {
+  display: flex;
+  gap: 18rpx;
+  flex-wrap: wrap;
+}
+.participant {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  border: 1rpx solid #dfe9dc;
+  border-radius: 14rpx;
+  padding: 15rpx 20rpx;
+  background: white;
+  font-size: 25rpx;
+}
+.participant checkbox {
+  transform: scale(0.8);
+}
+.preview {
+  margin-top: 28rpx;
+  background: #eff6eb;
+  font-size: 24rpx;
+  color: #6c8f70;
+}
+.preview .row {
+  margin-top: 12rpx;
+}

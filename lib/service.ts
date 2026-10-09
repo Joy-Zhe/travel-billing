@@ -6,7 +6,12 @@ import {
   splitEqually,
 } from "./core.ts";
 import type { Currency, Expense, Repayment, Trip, Snapshot } from "./core.ts";
-export type Identity = { userId: string; displayName: string; email: string };
+export type Identity = {
+  userId: string;
+  displayName: string;
+  email: string;
+  wechatAccountId?: string;
+};
 type Row = Record<string, any>;
 export class ApiError extends Error {
   status: number;
@@ -142,9 +147,15 @@ export class LedgerService {
     const f = this.tripFields(b);
     const id = crypto.randomUUID(),
       now = new Date().toISOString();
-    await this.db.batch([
+    const accountGate = this.user.wechatAccountId
+      ? "WHERE EXISTS (SELECT 1 FROM wechat_accounts WHERE id=? AND user_id=?)"
+      : "";
+    const accountArgs = this.user.wechatAccountId
+      ? [this.user.wechatAccountId, this.user.userId]
+      : [];
+    const result = await this.db.batch([
       this.stmt(
-        "INSERT INTO trips (id,name,destination,start_date,end_date,currency,owner_id,created_at) VALUES (?,?,?,?,?,?,?,?)",
+        `INSERT INTO trips (id,name,destination,start_date,end_date,currency,owner_id,created_at) SELECT ?,?,?,?,?,?,?,? ${accountGate}`,
         id,
         f.name,
         f.destination,
@@ -153,14 +164,17 @@ export class LedgerService {
         f.currency,
         this.user.userId,
         now,
+        ...accountArgs,
       ),
       this.stmt(
-        "INSERT INTO members (trip_id,user_id,joined_at) VALUES (?,?,?)",
+        "INSERT INTO members (trip_id,user_id,joined_at) SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM trips WHERE id=?)",
         id,
         this.user.userId,
         now,
+        id,
       ),
     ]);
+    check(result[0].meta.changes, "账号绑定状态已更新，请刷新后重试", 409);
     return { id };
   }
   async snapshot(id: string): Promise<Snapshot> {
@@ -229,6 +243,7 @@ export class LedgerService {
     result: Row,
     extra = "",
     allowArchived = false,
+    observedVersion?: number,
   ) {
     check(Number.isInteger(b.version) && b.version >= 0, "缺少账本版本");
     const requestId = text(b.requestId, 100);
@@ -245,14 +260,18 @@ export class LedgerService {
       );
       return JSON.parse(existing.result);
     }
+    if (observedVersion !== undefined && b.version !== observedVersion)
+      throw new ApiError(409, "账本已被其他成员更新，请刷新后重试");
     const op = crypto.randomUUID();
     // The unique mutation token gates every statement in this atomic batch, including when CAS fails.
     const response = await this.db.batch([
       this.stmt(
-        `UPDATE trips SET version=version+1,last_mutation=? ${extra} WHERE id=? AND version=? ${allowArchived ? "" : "AND archived=0"}`,
+        `UPDATE trips SET version=version+1,last_mutation=? ${extra} WHERE id=? AND version=? ${allowArchived ? "" : "AND archived=0"} AND EXISTS (SELECT 1 FROM members WHERE trip_id=? AND user_id=?)`,
         op,
         id,
         b.version,
+        id,
+        this.user.userId,
       ),
       ...build(op),
       this.stmt(
@@ -296,6 +315,7 @@ export class LedgerService {
         { ok: true },
         "",
         true,
+        t.version,
       );
     check(!t.archived, "旅行已归档，请先恢复", 409);
     const f = this.tripFields(b);
@@ -320,10 +340,13 @@ export class LedgerService {
         ),
       ],
       { ok: true },
+      "",
+      false,
+      t.version,
     );
   }
   async resetInvite(id: string, b: Row) {
-    await this.trip(id, true, true);
+    const t = await this.trip(id, true, true);
     const token = crypto.randomUUID() + crypto.randomUUID(),
       tokenHash = await hash(token),
       expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
@@ -342,6 +365,9 @@ export class LedgerService {
         ),
       ],
       { token, expiresAt },
+      "",
+      false,
+      t.version,
     );
   }
   async inviteInfo(token: string) {
@@ -357,13 +383,20 @@ export class LedgerService {
     const tokenHash = await hash(token),
       now = new Date().toISOString();
     const invite = await this.inviteInfo(token);
+    const accountGate = this.user.wechatAccountId
+      ? "AND EXISTS (SELECT 1 FROM wechat_accounts WHERE id=? AND user_id=?)"
+      : "";
+    const accountArgs = this.user.wechatAccountId
+      ? [this.user.wechatAccountId, this.user.userId]
+      : [];
     await this.db.batch([
       this.stmt(
-        "INSERT INTO members (trip_id,user_id,joined_at) SELECT trip_id,?,? FROM invites i JOIN trips t ON t.id=i.trip_id WHERE token_hash=? AND expires_at>? AND t.archived=0 ON CONFLICT(trip_id,user_id) DO NOTHING",
+        `INSERT INTO members (trip_id,user_id,joined_at) SELECT trip_id,?,? FROM invites i JOIN trips t ON t.id=i.trip_id WHERE token_hash=? AND expires_at>? AND t.archived=0 ${accountGate} ON CONFLICT(trip_id,user_id) DO NOTHING`,
         this.user.userId,
         now,
         tokenHash,
         now,
+        ...accountArgs,
       ),
       this.stmt(
         "UPDATE trips SET version=version+1 WHERE id=? AND EXISTS (SELECT 1 FROM members WHERE trip_id=? AND user_id=? AND joined_at=?)",
@@ -377,7 +410,7 @@ export class LedgerService {
     return { id: invite.id };
   }
   async saveExpense(id: string, b: Row, expenseId?: string) {
-    await this.trip(id, true);
+    const t = await this.trip(id, true);
     const title = text(b.title),
       value = amount(b.amount),
       when = date(b.date),
@@ -484,6 +517,8 @@ export class LedgerService {
       },
       { id: eid },
       ",currency_locked=1",
+      false,
+      t.version,
     );
   }
   async saveRepayment(id: string, b: Row, repaymentId?: string) {
@@ -550,6 +585,9 @@ export class LedgerService {
             ),
       ],
       { id: rid },
+      "",
+      false,
+      trip.version,
     );
   }
   async remove(
@@ -558,7 +596,7 @@ export class LedgerService {
     kind: "expenses" | "repayments",
     entityId: string,
   ) {
-    await this.trip(id, true);
+    const t = await this.trip(id, true);
     check(
       await this.stmt(
         `SELECT id FROM ${kind} WHERE id=? AND trip_id=?`,
@@ -596,6 +634,9 @@ export class LedgerService {
         ];
       },
       { ok: true },
+      "",
+      false,
+      t.version,
     );
   }
 }

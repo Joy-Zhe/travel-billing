@@ -1,8 +1,12 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { ApiError, LedgerService } from "../../../lib/service";
+import { dispatchLedger } from "../../../lib/dispatch";
+import { WechatAccounts } from "../../../lib/wechat";
 export const dynamic = "force-dynamic";
 async function handle(request: Request) {
+  const reply = (data: unknown, status = 200) =>
+    Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
   try {
     const url = new URL(request.url),
       path = url.pathname
@@ -10,8 +14,6 @@ async function handle(request: Request) {
         .split("/")
         .map(decodeURIComponent);
     const user = await getChatGPTUser();
-    const reply = (data: unknown, status = 200) =>
-      Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
     if (path[0] === "me" && path.length === 1 && request.method === "GET")
       return reply(user);
     if (!user) throw new ApiError(401, "请先登录");
@@ -32,59 +34,29 @@ async function handle(request: Request) {
       if (!body || typeof body !== "object" || Array.isArray(body))
         throw new ApiError(400, "请求格式无效");
     }
-    if (path[0] === "invites" && path.length === 2) {
-      if (method === "GET") return reply(await service.inviteInfo(path[1]));
-      if (method === "POST") return reply(await service.join(path[1]));
+    if (path.join("/") === "account/link-code" && method === "POST")
+      return reply(await new WechatAccounts(env.DB).createCode(user.userId));
+    if (path.join("/") === "account/wechat" && method === "GET") {
+      const result = await env.DB.prepare(
+        "SELECT COUNT(*) count FROM wechat_accounts WHERE user_id=?",
+      )
+        .bind(user.userId)
+        .first<{ count: number }>();
+      return reply({
+        boundCount: result?.count || 0,
+        gatewayConfigured: Boolean(
+          env.WECHAT_APP_ID && env.WECHAT_GATEWAY_SECRET,
+        ),
+      });
     }
-    if (path[0] === "trips") {
-      if (path.length === 1) {
-        if (method === "GET") return reply(await service.listTrips());
-        if (method === "POST")
-          return reply(await service.createTrip(body), 201);
-      }
-      const id = path[1],
-        entity = path[2],
-        entityId = path[3];
-      if (path.length === 2) {
-        if (method === "GET") return reply(await service.snapshot(id));
-        if (method === "PATCH")
-          return reply(await service.updateTrip(id, body));
-      }
-      if (entity === "settlement" && path.length === 3 && method === "GET") {
-        const s = await service.snapshot(id);
-        return reply({
-          members: s.members,
-          transfers: s.transfers,
-          repayments: s.repayments,
-          version: s.trip.version,
-        });
-      }
-      if (entity === "invite" && path.length === 3 && method === "POST")
-        return reply(await service.resetInvite(id, body));
-      if (entity === "expenses" || entity === "repayments") {
-        if (
-          (method === "POST" && path.length === 3) ||
-          (method === "PATCH" && path.length === 4)
-        )
-          return reply(
-            entity === "expenses"
-              ? await service.saveExpense(id, body, entityId)
-              : await service.saveRepayment(id, body, entityId),
-          );
-        if (method === "DELETE" && path.length === 4)
-          return reply(await service.remove(id, body, entity, entityId));
-      }
-    }
-    throw new ApiError(404, "接口不存在");
+    const result = await dispatchLedger(service, method, path, body);
+    return reply(result.data, result.status);
   } catch (error) {
     const known = error instanceof ApiError;
     if (!known) console.error("Ledger request failed", error);
-    return Response.json(
+    return reply(
       { error: known ? error.message : "服务暂时不可用，请稍后重试" },
-      {
-        status: known ? error.status : 500,
-        headers: { "Cache-Control": "no-store" },
-      },
+      known ? error.status : 500,
     );
   }
 }

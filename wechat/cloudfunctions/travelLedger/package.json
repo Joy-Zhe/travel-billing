@@ -1,0 +1,9 @@
+{
+  "name": "travel-ledger-gateway",
+  "version": "0.1.0",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "wx-server-sdk": "~3.0.1"
+  }
+}

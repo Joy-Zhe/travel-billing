@@ -5,6 +5,31 @@ import {
   primaryKey,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+export const wechatAccounts = sqliteTable(
+  "wechat_accounts",
+  {
+    id: text("id").primaryKey(),
+    appId: text("app_id").notNull(),
+    openId: text("open_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("wechat_identity").on(t.appId, t.openId)],
+);
+export const accountLinkCodes = sqliteTable("account_link_codes", {
+  hash: text("hash").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  expiresAt: text("expires_at").notNull(),
+  claimedBy: text("claimed_by"),
+});
+export const gatewayNonces = sqliteTable("gateway_nonces", {
+  nonce: text("nonce").primaryKey(),
+  expiresAt: integer("expires_at").notNull(),
+});
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

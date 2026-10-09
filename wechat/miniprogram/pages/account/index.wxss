@@ -1,0 +1,14 @@
+.profile {
+  margin-top: 32rpx;
+}
+.profile .avatar {
+  width: 82rpx;
+  height: 82rpx;
+  font-size: 35rpx;
+}
+.code-input {
+  font-size: 34rpx;
+  font-family: monospace;
+  letter-spacing: 4rpx;
+  text-transform: uppercase;
+}

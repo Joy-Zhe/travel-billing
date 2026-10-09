@@ -1,0 +1,29 @@
+{
+  "pages": [
+    "pages/trips/index",
+    "pages/trip/index",
+    "pages/expense/index",
+    "pages/repayment/index",
+    "pages/join/index",
+    "pages/account/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "同行账本",
+    "navigationBarBackgroundColor": "#f5f8f5",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f5f8f5",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#84958c",
+    "selectedColor": "#188675",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/trips/index", "text": "我的旅行" },
+      { "pagePath": "pages/account/index", "text": "我的账号" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
