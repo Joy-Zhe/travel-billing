@@ -78,6 +78,15 @@ test("mini record controllers load shared portions, save expenses and validate r
       return c;
     };
     const expense = controller("expenses");
+    const query = controller("repayments");
+    query.load = () => {};
+    query.onLoad({
+      tripId: "demo-trip",
+      fromId: encodeURIComponent("wx:encoded-payer"),
+      toId: encodeURIComponent("wx:encoded-recipient"),
+    });
+    assert.equal(query.options.fromId, "wx:encoded-payer");
+    assert.equal(query.options.toId, "wx:encoded-recipient");
     await expense.load(false);
     expense.field({
       currentTarget: { dataset: { field: "title" } },

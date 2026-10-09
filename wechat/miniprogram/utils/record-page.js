@@ -24,7 +24,15 @@ module.exports = function recordPage(kind) {
       preview: [],
     },
     onLoad(options) {
-      this.options = options;
+      this.options = Object.fromEntries(
+        Object.entries(options).map(([key, value]) => {
+          try {
+            return [key, decodeURIComponent(value)];
+          } catch {
+            return [key, value];
+          }
+        }),
+      );
       this.load(false);
     },
     async load(preserve) {
